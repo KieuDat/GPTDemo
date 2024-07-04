@@ -1,5 +1,6 @@
 using GPTDemo.Models;
 using GPTDemo.Services;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.Configure<GPTSettings>(
 builder.Configuration.GetSection("GPTSetting"));
 builder.Services.AddSingleton<GPTServices>();
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
