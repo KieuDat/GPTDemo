@@ -26,11 +26,11 @@ namespace OpenAIGPTDemo
             return data;
         }
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadFile(IFormFile file)
+        public async Task<string> UploadFile(IFormFile file)
         {
             if (file == null || file.Length == 0)
             {
-                return BadRequest("No file uploaded.");
+                return "No file uploaded.";
             }
 
             var filePath = Path.GetTempFileName();
@@ -39,7 +39,12 @@ namespace OpenAIGPTDemo
             {
                 await file.CopyToAsync(stream);
             }
-
+            return filePath;
+ 
+        }
+        [HttpPost("uploadToGPT")]
+        public async Task<IActionResult> UploadFiletoGPT(string filePath)
+        {
             var responseContent = await _GPTservices.UploadToGptApi(filePath);
 
             return Ok(responseContent);
