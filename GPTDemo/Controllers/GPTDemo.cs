@@ -18,7 +18,7 @@ namespace OpenAIGPTDemo
             this._GPTservices = _GPTservices;
         }
 
-        [HttpPost("CompletionGPT")]
+        [HttpPost("completionGPT")]
         public async Task<string> GetCompletion(string file_id, string text)
         {
             string data = await _GPTservices.CompletionsWithFiles(file_id, text);
