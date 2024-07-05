@@ -1,13 +1,16 @@
 ﻿using GPTDemo.Models;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using System.Net.Http.Headers;
+using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 namespace GPTDemo.Services
 {
     public class GPTServices
     {
-        private static readonly HttpClient client = new HttpClient();
+        private readonly HttpClient client = new HttpClient();
         private readonly IOptions<GPTSettings> _GPTSettings;
         public GPTServices(IOptions<GPTSettings> _GPTSettings)
         {
@@ -26,14 +29,40 @@ namespace GPTDemo.Services
 
             var requestBody = new GPTCompletionsWithFilesModel{ model = _GPTSettings.Value.Model, messages = Messages };
 
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_GPTSettings.Value.SecretKey}");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _GPTSettings.Value.SecretKey);
 
             var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
             var response = await client.PostAsync(_GPTSettings.Value.Url + "/chat/completions", content);
 
             var responseContent = await response.Content.ReadAsStringAsync();
             dynamic jsonResponse = JsonConvert.DeserializeObject(responseContent);
-            return jsonResponse.choices[0].text.ToString();
+            if (jsonResponse?.choices is not null)
+            {
+                return jsonResponse.choices[0].content.ToString();
+            }
+            else 
+            {
+                return jsonResponse.ToString();
+            }
+            
+        }
+
+        public async Task<string> UploadToGptApi(string filePath)
+        {
+            var url = _GPTSettings.Value.Url + "/files";
+
+            using (var form = new MultipartFormDataContent())
+            {
+                var fileContent = new ByteArrayContent(System.IO.File.ReadAllBytes(filePath));
+                fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+                form.Add(fileContent, "file", Path.GetFileName(filePath));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _GPTSettings.Value.SecretKey);
+
+                var response = await client.PostAsync(url, form);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                return responseContent;
+            }
         }
     }
 }
