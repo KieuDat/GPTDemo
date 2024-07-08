@@ -31,7 +31,7 @@ namespace OpenAIGPTDemo
                 return data;
         }
         public record fileUploadResult(string filePath, string fileExt);
-        [HttpPost("uploadFileGPT")]
+        [HttpPost("uploadFile")]
         public async Task<fileUploadResult> UploadFile(IFormFile file)
         {
             if (file == null || file.Length == 0)
