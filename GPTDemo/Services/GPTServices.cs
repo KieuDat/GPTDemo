@@ -6,6 +6,11 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using static System.Net.Mime.MediaTypeNames;
+using System.Data;
+using System;
+using System.Linq.Expressions;
+using System.Net.WebSockets;
 namespace GPTDemo.Services
 {
     public class GPTServices
@@ -16,19 +21,46 @@ namespace GPTDemo.Services
         {
             this._GPTSettings = _GPTSettings;
         }
-        public async Task<string> CompletionsWithFiles(string file_id, string text) 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="file_ids"></param>
+        /// <param name="message"></param>
+        /// <param name="role"></param> == user || assitant || ....
+        public record Threads(string role, List<string> messages, List<string>? file_ids);
+        public async Task<string> Completions(List<Threads> messages)
         {
-            List<Tools> tools = new List<Tools>();
+
+            var requestBody = new List<GPTCompletionsWithFilesModel>();
+            if (messages is not null && messages.Count > 0) {
+                List<Tools> tools = new List<Tools>();
                 tools.Add(new Tools { type = "file_search" });
-            List<Attachments> attachments = new List<Attachments>();
-                attachments.Add(new Attachments {tools = tools, file_id = file_id});
-            List<Contents> contents = new List<Contents>();
-                contents.Add(new Contents { type = "text", text = text});
-            List<Messages> Messages = new List<Messages>();
-                Messages.Add(new Messages { role = "user", content = contents, attachments = attachments});
+                foreach (var item in messages)
+                {
+                    List<Attachments> attachments = new List<Attachments>();
+                    if ( item.file_ids is not null && item.file_ids.Count > 0)
+                    {
+                        item.file_ids.ForEach(x => 
+                        {
+                            attachments.Add(new Attachments { tools = tools, file_id = x });
+                        });
+                    }
+                    List<Contents> contents = new List<Contents>();
+                    if(item.messages is not null && item.messages.Count > 0)
+                    {
+                        item.messages.ForEach(x =>
+                        {
+                            contents.Add(new Contents { type = "text", text = x });
+                        });
+                    }
+                    //contents.Add(new Contents { type = "text", text = item.message});
+                    List<Messages> Messages = new List<Messages>();
+                    Messages.Add(new Messages { role = item.role is not null ? item.role : "user", content = contents, attachments = attachments });
+                    var input = JsonConvert.SerializeObject(Messages);
 
-            var requestBody = new GPTCompletionsWithFilesModel{ model = _GPTSettings.Value.Model, messages = Messages };
-
+                    requestBody.Add(new GPTCompletionsWithFilesModel{ model = _GPTSettings.Value.Model, messages = Messages });
+                }
+            }
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _GPTSettings.Value.SecretKey);
 
             var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
@@ -47,10 +79,10 @@ namespace GPTDemo.Services
             
         }
 
-        public async Task<string> UploadToGptApi(string filePath)
+        public async Task<string> UploadToGptApi(string filePath, string typeFile)
         {
             var url = _GPTSettings.Value.Url + "/files";
-
+            string TypeFile = contentType(typeFile);
             using (var form = new MultipartFormDataContent())
             {
                 var fileContent = new ByteArrayContent(System.IO.File.ReadAllBytes(filePath));
@@ -64,5 +96,57 @@ namespace GPTDemo.Services
                 return responseContent;
             }
         }
+        static string contentType(string type)
+        {
+            switch (type)
+            {
+                case ".c":
+                    return "text/x-c";
+                case ".cs":
+                    return "text/x-csharp";
+                case ".cpp":
+                    return "text/x-c++";
+                case ".doc":
+                    return "application/msword";
+                case ".docx":
+                    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                case ".html":
+                    return "text/html";
+                case ".java":
+                    return "text/x-java";
+                case ".json":
+                    return "application/json";
+                case ".md":
+                    return "text/markdown";
+                case ".pdf":
+                    return "application/pdf";
+                case ".php":
+                    return "text/x-php";
+                case ".pptx":
+                    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+                case ".py":
+                    return "text/x-python";
+                case ".s-py": // cái này là .py nhung Đạt fake thành s-py để tránh lỗi case
+                    return "text/x-script.python";
+                case ".rb":
+                    return "text/x-ruby";
+                case ".tex":
+                    return "text/x-tex";
+                case ".txt":
+                    return "text/plain";
+                case ".css":
+                    return "text/css";
+                case ".js":
+                    return "text/javascript";
+                case ".sh":
+                    return "application/x-sh";
+                case ".ts":
+                    return "application/typescript";
+                default:
+                    throw new Exception("File không nằm trong danh sách hỗ trợ");
+                    
+            }
+        }
+
     }
 }
