@@ -24,10 +24,11 @@ namespace OpenAIGPTDemo
             this._GPTservices = _GPTservices;
         }
 
+        
         [HttpPost("completionGPT")]
-        public async Task<string> GetCompletion(List<Threads> threads)
+        public async Task<string> GetCompletion(Completion? completion)
         {
-                string data = await _GPTservices.Completions(threads);
+                string data = await _GPTservices.Completions(completion);
                 return data;
         }
         public record fileUploadResult(string filePath, string fileExt);

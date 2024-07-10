@@ -11,6 +11,8 @@ using System.Data;
 using System;
 using System.Linq.Expressions;
 using System.Net.WebSockets;
+using Microsoft.AspNetCore.SignalR.Protocol;
+using System.Dynamic;
 namespace GPTDemo.Services
 {
     public class GPTServices
@@ -27,17 +29,27 @@ namespace GPTDemo.Services
         /// <param name="file_ids"></param>
         /// <param name="message"></param>
         /// <param name="role"></param> == user || assitant || ....
-        public record Threads(string role, List<string> messages, List<string>? file_ids);
-        public async Task<string> Completions(List<Threads> messages)
+        //public record Threads(string role, List<string> messages, List<string>? file_ids, Optional optional);
+        public class Threads
         {
+            public string? role {  get; set; }
+            public List<string> messages { get; set; }
+            public List<string>? file_ids { get; set; }
+        }
+        //public Optional? optional { get; set; }
+        public record Completion(List<Threads>? threads, Optional? optionals);
+        public async Task<string> Completions(Completion completion)
+        {
+            //var requestBody =  new GPTCompletionsModel{ };
+            List<Messages> messages_body = new List<Messages>();
 
-            var requestBody = new List<GPTCompletionsWithFilesModel>();
-            if (messages is not null && messages.Count > 0) {
+            if (completion.threads is not null && completion.threads.Count > 0) {
                 List<Tools> tools = new List<Tools>();
                 tools.Add(new Tools { type = "file_search" });
-                foreach (var item in messages)
+                foreach (var item in completion.threads)
                 {
                     List<Attachments> attachments = new List<Attachments>();
+                    List<Contents> contents = new List<Contents>();
                     if ( item.file_ids is not null && item.file_ids.Count > 0)
                     {
                         item.file_ids.ForEach(x => 
@@ -45,7 +57,6 @@ namespace GPTDemo.Services
                             attachments.Add(new Attachments { tools = tools, file_id = x });
                         });
                     }
-                    List<Contents> contents = new List<Contents>();
                     if(item.messages is not null && item.messages.Count > 0)
                     {
                         item.messages.ForEach(x =>
@@ -53,14 +64,29 @@ namespace GPTDemo.Services
                             contents.Add(new Contents { type = "text", text = x });
                         });
                     }
-                    //contents.Add(new Contents { type = "text", text = item.message});
-                    List<Messages> Messages = new List<Messages>();
-                    Messages.Add(new Messages { role = item.role is not null ? item.role : "user", content = contents, attachments = attachments });
-                    var input = JsonConvert.SerializeObject(Messages);
-
-                    requestBody.Add(new GPTCompletionsWithFilesModel{ model = _GPTSettings.Value.Model, messages = Messages });
+                    messages_body.Add(new Messages { role = item.role is not null ? item.role : "user", content = contents, attachments = attachments });
                 }
             }
+            dynamic requestBody = new ExpandoObject();
+            requestBody.model = _GPTSettings.Value.Model;
+            requestBody.messages = messages_body;
+
+            if (completion?.optionals?.temperature is not null && completion?.optionals?.temperature != 0) {
+                requestBody.temperature = completion?.optionals?.temperature;
+            }
+            if (completion?.optionals?.max_token is not null && completion?.optionals?.max_token != 0) {
+                requestBody.max_token = completion?.optionals?.max_token;
+            }
+            if (completion?.optionals?.top_p is not null && completion?.optionals?.top_p != 0) {
+                requestBody.top_p = completion?.optionals?.top_p;
+            }
+            if (completion?.optionals?.presence_penalty is not null && completion?.optionals?.presence_penalty != 0) {
+                requestBody.presence_penalty = completion?.optionals?.presence_penalty;
+            }
+            if (completion?.optionals?.frequency_penalty is not null && completion?.optionals?.frequency_penalty != 0) {
+                requestBody.frequency_penalty = completion?.optionals?.frequency_penalty;
+            }
+            //var check = JsonConvert.SerializeObject(requestBody);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _GPTSettings.Value.SecretKey);
 
             var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
@@ -68,14 +94,14 @@ namespace GPTDemo.Services
 
             var responseContent = await response.Content.ReadAsStringAsync();
             dynamic jsonResponse = JsonConvert.DeserializeObject(responseContent);
-            if (jsonResponse?.choices is not null)
-            {
-                return jsonResponse.choices[0].content.ToString();
-            }
-            else 
-            {
+            //if (jsonResponse?.choices is not null)
+            //{
+            //    return jsonResponse.choices[0].content.ToString();
+            //}
+            //else
+            //{
                 return jsonResponse.ToString();
-            }
+            //}
             
         }
 
